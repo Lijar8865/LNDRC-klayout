@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category>drc</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>drc_scripts</group-name>
+ <menu-path>tools_menu.drc.end</menu-path>
+ <interpreter>dsl</interpreter>
+ <dsl-interpreter-name>drc-dsl-xml</dsl-interpreter-name>
+ <text># Read about DRC scripts in the User Manual under "Design Rule Check (DRC)"
+
+
+
+# 
+
+
+DENSITY = false
+
+# setting up the DRC UI
+#####################################################################################################
+# tiles(500.um)
+# tile_borders(91.um)
+tiles(500.um)
+tile_borders(91.um)
+threads(14) #computer para
+StartTime = Time.now
+print "Start Time:"+StartTime.to_s+"\n"
+
+inputFile = $input
+inputCell = $cell
+if inputCell
+source(inputFile,inputCell)
+else
+source(inputFile)
+end
+cv = RBA::CellView::active
+print "inputFile: "+inputFile.to_s+"\n"
+print "inputCell: "+inputCell.to_s+"\n"
+print "source_cellname: "+source.cell_name+"\n"
+#print "source_cellname: "+source.filename+"\n"
+#print "a_cellname: "+a.cell_name+"\n"
+#print "a_cellname: "+a.filename+"\n"
+
+if inputFile
+fileName = File.basename(inputFile)
+print "Input FileName: " + fileName +"\n"
+else
+fileName = cv.name
+end
+reportName = fileName.sub(".gds","").sub(".GDS","") + "_HK_result"
+
+if inputCell
+print "inputCell: "+inputCell.to_s + "\n"
+reportName = fileName.sub(".gds","").sub(".GDS","") + "_" + inputCell.to_s + "_HK_result"
+else
+print "No CellName Input.\n"
+end
+
+print "CellName: " + source.cell_name + "\n"
+print "reportName: " + reportName + "\n"
+
+report("HK_LN",reportName)
+#####################################################################################################
+deep
+# Layer definitions
+#####################################################################################################
+SLABWG = input(3, 0)
+STRIPWG  = input(2, 0)
+M1= input(1, 0)
+HT = input(10, 0)
+M2 = input(5, 0)
+#####################################################################################################
+
+# setting up the DRC parameters
+#####################################################################################################
+min_proj = 1.nm
+max_proj = 50.mm
+
+foundry_mnW_dummy   = 8.0
+foundry_mnS_dummy   = 2.0
+dummy_area = foundry_mnW_dummy*foundry_mnW_dummy
+port_area = 2.0.um2
+
+tolerance = 0.001
+angle_tolerance = 0.1
+# mini space and width
+rib_space           =0.4
+rib_w               =0.4
+slab_space           =0.4
+slab_w               =0.4
+metal_space          =0.2
+metal_w              =1
+HT_w                =1
+HT_s                =1
+
+slab_enc_rib_Angle = 0.1
+grat_enc_rib_Angle = 30
+normal_Angle = 10
+min_proj = 3.nm
+max_proj = 50.mm
+
+# connect check parameters
+connect_space = 0.1  #connect space should be less than wg space
+connect_angle = 5   #connect angle should be less than wg angle
+#####################################################################################################
+
+
+#---------------------------
+#---- CONNECT RULES         ----
+#---------------------------
+
+#-------------------------------------------------------
+#this is try to check the misalignment of HMWG layer, there could be some which are not errors.
+# HMWG_connect_error=HMWG.space(0.2.um,angle_limit(91)).edges-HMWG.space(0.2.um,angle_limit(80)).edges
+# HMWG_connect_error.output("HMWG.Connect.01", "Optional:This is try to check the misalignment of HMWG layer,there may be something not wrong")
+#----------------------------------------------
+
+
+#---------------------------
+#---- SlAB RULES        ----
+#---------------------------
+SLABWG.width(slab_w-tolerance,projection, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("Slab.Wid.01", "Slab_width below "+slab_w.to_s+"um")
+SLABWG.space(slab_space-tolerance,euclidian, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("Slab.Spac.01", "Slab_space below "+slab_space.to_s+"um\n Or check the misalignment!")
+
+
+#//---------------------------
+#//---- STRIP RULES       ----
+#//---------------------------
+STRIPWG.width(rib_w-tolerance,projection, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("Rib.Wid.01", "Rib_width below "+rib_w.to_s+"um")
+STRIPWG.space(rib_space-tolerance,euclidian, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("Rib.Spac.01", "Rib_space below "+rib_space.to_s+"um\n Or check the misalignment!")
+# polyon(0) means the original polygon, not the enlarged polygon
+# check connection
+# STRIPWG_connect=STRIPWG.space(0.1,angle_limit(1))
+# STRIPWG_connect_0 = STRIPWG.with_distance(0)
+# length_diff=STRIPWG_connect.first_edges.length-STRIPWG_connect.second_edges.length
+# if length_diff>0
+# STRIPWG_connect.output("STRIPWG_connect_error.01", "Please Check the misalignment!")
+# end
+# print "CellName: " + length_diff.to_s + "\n"
+
+# STRIPWG_connect=STRIPWG.iso(0.2,projection,angle_limit(91),projection_limits(min_proj,max_proj))
+# STRIPWG_connect.output("STRIPWG_connect_error.01", "Please Check the misalignment!")
+
+# STRIPWG_connect=STRIPWG.space(0.4,angle_limit(91)).polygons(0)-STRIPWG.space(0.4,angle_limit(80)).polygons(0)
+# STRIPWG_connect.output("STRIPWG_connect_error.01", "Please Check the misalignment!")
+
+STRIPWG_connect=STRIPWG.with_angle(270.degree-angle_tolerance,270.degree+angle_tolerance)
+STRIPWG_connect.output("Rib.Connect.01",  "Please Check the misalignment!")
+# STRIPWG_connect2=STRIPWG.merged.edges.with_length(1.3.um-tolerance,1.3.um+tolerance)
+
+STRIPWG_connect2=STRIPWG.merged.edges.with_length(1.3.um-tolerance,1.3.um+tolerance).space(13.um,angle_limit(1))
+
+STRIPWG_connect2.output("Rib.Connect.02","Exist Gap!\nPlease Check the connection!")
+
+
+SLABWG.enclosing(STRIPWG,0.2.um).output("Rib in Slab.01", "Minimum inclusion of Rib in Slab:0.4 um")
+
+#//---------------------------
+#//---- Metal 1 (M1)  ----
+#//---------------------------
+M1.width(metal_w-tolerance,projection, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("M1.Wid.01", "M1_width should greater "+metal_w.to_s+"um")
+M1.space(metal_space-tolerance,euclidian, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("M1.Spac.01", "M1_space should greater "+metal_space.to_s+"um")
+# interative
+# M1_connect_M2 = M1-(M1 &amp; M2).not_outside(M1)
+# M1_connect_M2.rectangles.output("M1_connect_M2", "check connection between M1 and M2")
+
+#
+#/---------------------------
+#---- Heater (HT)   ----
+#---------------------------
+#self
+HT.width(HT_w-tolerance,projection, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("HT.Wid.01", "HT_width should greater "+HT_w.to_s+"um")
+HT.space(HT_s-tolerance,euclidian, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("HT.Spac.01", "HT_space should greater "+HT_s.to_s+"um")
+#interative
+# #---TiN heater must have two terminals connected to V1---
+# M2_HT_V1=(M2 &amp; HT).not_outside(V1)
+# HT.outside(M2_HT_V1).output("HT_no_V1", "Optional--TiN heater have no terminals connected to V1 is not allowed")
+# HT_connect_M2 = (HT &amp; M2).not_outside(HT)
+# print "HT_num: " + HT_connect_M2.count.to_s + "\n"
+# HT_size_merged = HT.sized(0.1.um) or HT
+# HT_size_merged.output("HT_size_merged", "check the size of HT")
+# print "HT_size_merged_num: " + HT_size_merged.count.to_s + "\n"
+
+# if HT_connect_M2.count % 2 != 0
+# HT_connect_M2.output("HT_connect_M2", "check connection between HT and M2")
+# end
+
+
+
+#---------------------------
+#---- Metal 2 (M2) ----
+#---------------------------
+
+M2.width(metal_w-tolerance,projection, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("M2.Wid.01", "M2_width should greater "+metal_w.to_s+"um")
+M2.space(metal_space-tolerance,euclidian, angle_limit(normal_Angle), projection_limits(min_proj,max_proj)).polygons(0)\
+.output("M2.Spac.01", "M2_space should greater "+metal_space.to_s+"um")
+# M2.enclosing(V1,0.4.um).output("M2.E.V1.01", "Minimum inclusion of V1 in M2=0.4 um")
+
+
+
+
+#-------------------------------------------------------------
+#-------------------density check ----------------------------
+#--------------------------------------------------------------
+### the density check is run only if this selection (at the top of the DRC setup) is true (false if not) :
+### layout size :
+CHIP = extent.sized(0.0) 
+if DENSITY  
+#------------------------------------------SLABWG------------------------------------
+    if (SLABWG.area / CHIP.area &gt;= 0.1)
+        CHIP.output("SLABWG_density", "The density of SLABWG  should be less than 10% :  #{(100 * SLABWG.area / CHIP.area).to_s}%")
+    end
+#------------------------------------------STRIPWG------------------------------------
+    if (STRIPWG.area / CHIP.area &gt;= 0.2)
+        CHIP.output("STRIPWG_density", "The density of STRIPWG should be less than 20% :  #{(100 * STRIPWG.area / CHIP.area).to_s}%")
+    end  
+#------------------------------------------M1------------------------------------
+     if ((M1.area / CHIP.area &lt;= 0.1  )   ||  (M1.area / CHIP.area &gt;= 0.5))
+        CHIP.output("M1_density", "The density of M1 should range from 10% to 50% :  #{(100 * M1.area / CHIP.area).to_s}%")
+    end  
+#------------------------------------------HT------------------------------------
+    if (HT.area / CHIP.area &gt; 0.5)
+        CHIP.output("HT_density", "The density of HT should be less than 10% :  #{(100 * HT.area / CHIP.area).to_s}%")
+    end  
+#------------------------------------------M2------------------------------------
+    if (M2.area / CHIP.area &gt; 0.5)
+        CHIP.output("M2_density", "The density of M2 should be less than 50% :  #{(100 * M2.area / CHIP.area).to_s}%")
+    end  
+end
+
+
+
+
+
+FinishTime = Time.now
+print "Finish Time:"+FinishTime.to_s+"\n"
+print "Running Time #{(FinishTime-StartTime).round(3)} seconds"+"\n"
+
+</text>
+</klayout-macro>
